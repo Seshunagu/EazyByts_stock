@@ -30,14 +30,7 @@ public class SecurityConfig {
             .csrf().disable()
             .sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS).and()
             .authorizeHttpRequests(auth -> auth
-                // API endpoints
-                .requestMatchers("/api/**").permitAll()
-                // static resources
-                .requestMatchers("/login.html", "/trade.html", "/favicon.ico").permitAll()
-                // JS/CSS: allow all under root
-                .requestMatchers("/js/**", "/css/**").permitAll()
-                // everything else requires authentication
-                .anyRequest().authenticated()
+                .anyRequest().permitAll() // temporarily allow all requests
             );
 
         return http.build();
@@ -46,8 +39,10 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(Arrays.asList("http://localhost:8080")); // frontend origin
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE"));
+
+        // Allow all origins for deployment; you can restrict later
+        configuration.setAllowedOrigins(Arrays.asList("*"));
+        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("*"));
         configuration.setAllowCredentials(true);
 
