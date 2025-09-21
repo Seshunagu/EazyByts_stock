@@ -1,0 +1,799 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Stock Trading Simulation</title>
+<style>
+  :root{
+    --bg:#0f1724; --card:#0b1220; --muted:#94a3b8; --accent:#06b6d4;
+    --success:#10b981; --danger:#ef4444; --glass: rgba(255,255,255,0.04);
+    --glass-2: rgba(255,255,255,0.02); --glass-border: rgba(255,255,255,0.06);
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;margin:0;font-family:Inter, sans-serif;color:#e6eef6;background:linear-gradient(180deg,#071127 0%,#071b2a 60%);}
+  a{color:inherit;}
+  .app{min-height:100vh;display:grid;grid-template-columns:300px 1fr 360px;gap:20px;padding:28px;align-items:start;}
+  header.topbar{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+  .brand{display:flex;gap:12px;align-items:center}
+  .logo{width:44px;height:44px;border-radius:10px;background:linear-gradient(135deg,var(--accent),#7c3aed);display:flex;align-items:center;justify-content:center;color:#051025;font-weight:700;transition:transform .25s ease}
+  .logo:hover{transform:rotate(-6deg) scale(1.03);}
+  .brand h1{font-size:16px;margin:0}
+  .brand p{margin:0;font-size:12px;color:var(--muted)}
+  .actions{display:flex;gap:10px;position:relative}
+  .dropdown{position:absolute;right:0;top:100%;background:var(--card);border:1px solid var(--glass-border);border-radius:8px;overflow:hidden;min-width:150px;display:none;z-index:50}
+  .dropdown .btn{display:block;width:100%;text-align:left;border:none;border-bottom:1px solid rgba(255,255,255,0.06);border-radius:0;margin:0}
+  .dropdown .btn:last-child{border-bottom:none}
+  aside.sidebar{background:linear-gradient(180deg,var(--card), rgba(11,18,32,0.8));border-radius:14px;padding:18px;border:1px solid var(--glass-border);backdrop-filter: blur(6px);}
+  .search{display:flex;gap:8px;margin-bottom:14px}
+  .search input{flex:1;padding:10px;border-radius:10px;border:1px solid var(--glass-border);background:transparent;color:inherit}
+  .watchlist h3{margin:6px 0 12px;font-size:14}
+  .stock-item{display:flex;justify-content:space-between;padding:8px;border-radius:8px;cursor:pointer}
+  .stock-item:hover{background:var(--glass)}
+  .ticker{font-weight:600}
+  .price{font-weight:700}
+  .small{font-size:12px;color:var(--muted)}
+  main.card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));padding:18px;border-radius:14px;border:1px solid var(--glass-border);backdrop-filter: blur(6px)}
+  .market-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+  .market-table{width:100%;border-collapse:collapse}
+  .market-table th,.market-table td{padding:10px;text-align:left}
+  .market-table tr{border-top:1px dashed rgba(255,255,255,0.03)}
+  .positive{color:var(--success)}
+  .negative{color:var(--danger)}
+  .panel{background:linear-gradient(180deg,var(--card), rgba(11,18,32,0.7));padding:18px;border-radius:14px;border:1px solid var(--glass-border);}
+  .balance{font-size:28px;font-weight:700}
+  .portfolio-list{margin-top:12px}
+  .portfolio-item{display:flex;justify-content:space-between;padding:8px;border-radius:8px}
+  .btn{display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border-radius:10px;border:1px solid transparent;cursor:pointer}
+  .btn-primary{background:linear-gradient(90deg,var(--accent),#7c3aed);color:#041021}
+  .btn-ghost{background:transparent;border:1px solid var(--glass-border);color:var(--muted)}
+  .overlay{position:fixed;inset:0;background:rgba(3,6,12,0.55);display:flex;align-items:center;justify-content:center;z-index:40}
+  .modal{width:100%;max-width:920px;background:#061023;border-radius:12px;padding:18px;border:1px solid var(--glass-border);}
+  .grid-3{display:grid;grid-template-columns:1fr 2fr;gap:16px}
+  label{font-size:13px;color:var(--muted);display:block;margin-bottom:6px}
+  input,select{width:100%;padding:10px;border-radius:8px;border:1px solid var(--glass-border);background:transparent;color:inherit}
+  .form-row{margin-bottom:12px}
+  .muted-tiny{font-size:11px;color:var(--muted)}
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand">
+    <div class="logo">ST</div>
+    <div>
+      <h1>StockSim</h1>
+      <p>Practice trading — zero real money</p>
+    </div>
+  </div>
+  <div class="actions" id="headerActions"></div>
+</header>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="search">
+      <input id="searchTicker" placeholder="Search ticker (e.g. AAPL)" />
+      <button class="btn btn-ghost" id="addWatch">Add</button>
+    </div>
+    <div class="watchlist">
+      <h3>Watchlist</h3>
+      <div id="watchListContainer"></div>
+    </div>
+    <hr style="border:none;border-top:1px solid var(--glass-border);margin:12px 0" />
+    <div class="small muted-tiny">Pro tip: Click any stock to open the trade drawer. Prices update every 2s.</div>
+  </aside>
+
+  <main class="card">
+    <div class="market-header">
+      <div>
+        <h3>Market</h3>
+        <div class="small">Simulated stream of popular tickers</div>
+      </div>
+      <div>
+        <button class="btn btn-ghost" id="toggleSimulator">Pause</button>
+        <button class="btn btn-primary" id="openTrade">Quick trade</button>
+      </div>
+    </div>
+    <table class="market-table" id="marketTable">
+      <thead>
+        <tr><th>Ticker</th><th>Price</th><th>Change</th><th>Vol</th><th>Action</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </main>
+
+  <aside class="panel">
+    <div>
+      <div class="small">Account balance</div>
+      <div class="balance" id="balance">$0.00</div>
+      <div class="muted-tiny">Cash: <span id="cash">$0.00</span> &nbsp; • &nbsp; P/L: <span id="pl">$0.00</span></div>
+    </div>
+
+    <div style="margin-top:12px">
+      <div class="small">Portfolio</div>
+      <div class="portfolio-list" id="portfolioList"></div>
+    </div>
+
+    <div style="margin-top:16px">
+      <div class="small">Order history</div>
+      <div id="orderHistory" class="muted-tiny" style="max-height:220px;overflow:auto;margin-top:8px"></div>
+    </div>
+  </aside>
+</div>
+
+<!-- Trade Modal -->
+<div id="tradeModal" class="overlay" style="display:none">
+  <div class="modal" role="dialog" aria-modal="true">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <h3 id="tradeTitle">Trade</h3>
+      <button class="btn btn-ghost" id="closeTrade">Close</button>
+    </div>
+    <div class="grid-3">
+      <div>
+        <div class="form-row"><label>Ticker</label><input id="tradeTicker" /></div>
+        <div class="form-row"><label>Price (sim)</label><input id="tradePrice" disabled /></div>
+        <div class="form-row"><label>Quantity</label><input id="tradeQty" type="number" value="1" /></div>
+        <div style="display:flex;gap:10px">
+          <button class="btn btn-primary" id="buyBtn">Buy</button>
+          <button class="btn btn-ghost" id="sellBtn">Sell</button>
+        </div>
+      </div>
+      <div>
+        <div class="small">Order preview</div>
+        <div style="margin-top:8px;padding:12px;border-radius:8px;background:var(--glass-2);border:1px solid var(--glass-border)">
+          <div>Type: <span id="previewType">Buy</span></div>
+          <div>Amount: <span id="previewAmount">$0</span></div>
+          <div>Cash after: <span id="previewCash">$0</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Add Funds Modal -->
+<div id="addFundsModal" class="overlay" style="display:none">
+  <div class="modal" role="dialog" aria-modal="true" style="max-width:400px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <h3>Add Funds</h3>
+      <button class="btn btn-ghost" id="closeAddFunds">Close</button>
+    </div>
+    <div style="display:flex;gap:10px;margin-bottom:12px">
+      <button class="btn btn-primary" id="manualAddBtn" style="flex:1">Enter Amount</button>
+      <button class="btn btn-ghost" id="bankAddBtn" style="flex:1">Add Bank Account</button>
+    </div>
+    <div id="manualAddContainer" style="display:none">
+      <div class="form-row">
+        <label>Amount to Add</label>
+        <input id="addAmountInput" type="number" placeholder="Enter amount" />
+      </div>
+      <button class="btn btn-primary" id="addFundsExecuteBtn">Add Funds</button>
+    </div>
+  </div>
+</div>
+
+<!-- Order History Modal -->
+<div id="orderHistoryModal" class="overlay" style="display:none">
+  <div class="modal" role="dialog" aria-modal="true" style="max-width:600px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <h3>Order History</h3>
+      <button class="btn btn-ghost" id="closeOrderHistory">Close</button>
+    </div>
+    <div class="small">All executed trades</div>
+    <table class="market-table" style="margin-top:12px">
+      <thead>
+        <tr><th>Type</th><th>Ticker</th><th>Quantity</th><th>Price</th><th>Date</th></tr>
+      </thead>
+      <tbody id="orderHistoryTable"></tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Bank Account Modal (Optional, Uncomment to Use) -->
+<!--
+<div id="bankAccountModal" class="overlay" style="display:none">
+  <div class="modal" role="dialog" aria-modal="true" style="max-width:400px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <h3>Feature Unavailable</h3>
+      <button class="btn btn-ghost" id="closeBankAccountModal">Close</button>
+    </div>
+    <div class="small">Account feature not simulated</div>
+  </div>
+</div>
+-->
+
+<script>
+// Utilities
+const fmt = n => typeof n === 'number' ? n.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }) : n;
+const rnd = (min, max) => Math.random() * (max - min) + min;
+
+// API Base URL
+const API = "http://localhost:8080/api";
+
+// Market Data (kept local for simulation)
+const top100Tickers = [
+  { t: 'AAPL' }, { t: 'MSFT' }, { t: 'GOOGL' }, { t: 'AMZN' }, { t: 'TSLA' },
+  { t: 'NVDA' }, { t: 'META' }, { t: 'BRK.B' }, { t: 'UNH' }, { t: 'JNJ' },
+  { t: 'V' }, { t: 'PG' }, { t: 'MA' }, { t: 'HD' }, { t: 'KO' },
+  { t: 'DIS' }, { t: 'PEP' }, { t: 'MRK' }, { t: 'PFE' }, { t: 'ABBV' }
+];
+let market = top100Tickers.map(s => ({ t: s.t, p: rnd(20, 500), change: rnd(-2, 2), vol: Math.floor(rnd(10000, 90000)) }));
+
+// User
+let user;
+async function initializeUser() {
+  const storedSession = localStorage.getItem('session');
+  console.log('Stored session:', storedSession);
+  if (storedSession) {
+    try {
+      user = JSON.parse(storedSession);
+      console.log('Parsed user:', user);
+      if (!user.id) {
+        throw new Error('User ID is missing in session');
+      }
+      const res = await fetch(`${API}/users/${user.id}`, {
+        method: 'GET',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include'
+      });
+      console.log('Fetch response status:', res.status);
+      console.log('Fetch response headers:', [...res.headers.entries()]);
+      if (res.ok) {
+        user = await res.json();
+        console.log('Fetched user data:', user);
+        localStorage.setItem('session', JSON.stringify(user));
+      } else if (res.status === 403) {
+        throw new Error('Access denied: Authentication required');
+      } else if (res.status === 404) {
+        throw new Error('User not found');
+      } else {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(`Failed to fetch user data: ${res.status} ${res.statusText} - ${errorData.message || 'Unknown error'}`);
+      }
+    } catch (err) {
+      console.error('Initialize user error:', err);
+      alert(`Error fetching user data: ${err.message}`);
+      localStorage.removeItem('session');
+      window.location.href = 'login.html';
+    }
+  } else {
+    console.warn('No session found');
+    alert('No user session found. Please log in.');
+    window.location.href = 'login.html';
+  }
+}
+
+// DOM Elements
+const balanceEl = document.getElementById('balance');
+const cashEl = document.getElementById('cash');
+const plEl = document.getElementById('pl');
+const portfolioList = document.getElementById('portfolioList');
+const orderHistory = document.getElementById('orderHistory');
+const headerActions = document.getElementById('headerActions');
+const watchListContainer = document.getElementById('watchListContainer');
+const addWatchBtn = document.getElementById('addWatch');
+const searchTicker = document.getElementById('searchTicker');
+
+const addFundsModal = document.getElementById('addFundsModal');
+const closeAddFundsBtn = document.getElementById('closeAddFunds');
+const addAmountInput = document.getElementById('addAmountInput');
+const addFundsExecuteBtn = document.getElementById('addFundsExecuteBtn');
+const manualAddBtn = document.getElementById('manualAddBtn');
+const bankAddBtn = document.getElementById('bankAddBtn');
+const manualAddContainer = document.getElementById('manualAddContainer');
+
+const tradeModal = document.getElementById('tradeModal');
+const closeTradeBtn = document.getElementById('closeTrade');
+const tradeTickerInput = document.getElementById('tradeTicker');
+const tradePriceInput = document.getElementById('tradePrice');
+const tradeQtyInput = document.getElementById('tradeQty');
+const buyBtn = document.getElementById('buyBtn');
+const sellBtn = document.getElementById('sellBtn');
+const previewType = document.getElementById('previewType');
+const previewAmount = document.getElementById('previewAmount');
+const previewCash = document.getElementById('previewCash');
+
+const marketTableBody = document.querySelector('#marketTable tbody');
+const orderHistoryModal = document.getElementById('orderHistoryModal');
+const closeOrderHistoryBtn = document.getElementById('closeOrderHistory');
+const orderHistoryTable = document.getElementById('orderHistoryTable');
+
+// --- Watchlist Functions ---
+async function renderWatchlist() {
+  try {
+    const res = await fetch(`${API}/watchlist/${user.id}`, {
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include'
+    });
+    if (!res.ok) {
+      console.error('Failed to fetch watchlist:', res.status, res.statusText);
+      return;
+    }
+    const watchlist = await res.json();
+    const existingItems = Array.from(watchListContainer.children);
+    const currentTickers = new Set(watchlist);
+
+    // Remove items no longer in watchlist
+    existingItems.forEach(item => {
+      const ticker = item.querySelector('.ticker')?.textContent;
+      if (ticker && !currentTickers.has(ticker)) {
+        item.remove();
+      }
+    });
+
+    // Update or add items
+    watchlist.forEach(ticker => {
+      const stock = market.find(s => s.t === ticker) || { t: ticker, p: 0, change: 0 };
+      let item = watchListContainer.querySelector(`.stock-item[data-ticker="${ticker}"]`);
+      if (!item) {
+        // Create new item
+        item = document.createElement('div');
+        item.className = 'stock-item';
+        item.dataset.ticker = ticker;
+        item.innerHTML = `
+          <div class="ticker">${stock.t}</div>
+          <div class="price">$${stock.p.toFixed(2)}</div>`;
+        item.onclick = () => openTradeModal(stock.t);
+        watchListContainer.appendChild(item);
+      } else {
+        // Update existing item's price
+        item.querySelector('.price').textContent = `$${stock.p.toFixed(2)}`;
+      }
+    });
+  } catch (err) {
+    console.error('Error fetching watchlist:', err);
+  }
+}
+
+addWatchBtn.onclick = async () => {
+  const ticker = searchTicker.value.trim().toUpperCase();
+  if (!ticker || !top100Tickers.some(s => s.t === ticker)) {
+    alert('Enter a valid ticker from the market list');
+    return;
+  }
+  try {
+    const res = await fetch(`${API}/watchlist/${user.id}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ ticker })
+    });
+    if (res.ok) {
+      await renderWatchlist();
+      searchTicker.value = '';
+    } else {
+      alert('Error adding ticker to watchlist');
+    }
+  } catch (err) {
+    alert('Network error: ' + err);
+  }
+};
+
+// --- Render Functions ---
+async function renderPortfolio() {
+  try {
+    // Fetch portfolio
+    const portfolioRes = await fetch(`${API}/portfolio/${user.id}`, {
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include'
+    });
+    const portfolio = await portfolioRes.json();
+
+    // Fetch holdings
+    const holdingsRes = await fetch(`${API}/holdings/${user.id}`, {
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include'
+    });
+    const holdings = await holdingsRes.json();
+
+    // Fetch order history
+    const ordersRes = await fetch(`${API}/orders/${user.id}`, {
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include'
+    });
+    const orders = await ordersRes.json();
+
+    // Update portfolio list
+    const existingPortfolioItems = Array.from(portfolioList.children);
+    const updatedTickers = new Set(holdings.map(h => h.ticker));
+
+    // Remove items for tickers no longer in holdings
+    existingPortfolioItems.forEach(item => {
+      const ticker = item.querySelector('.ticker')?.textContent;
+      if (ticker && !updatedTickers.has(ticker)) {
+        item.remove();
+      }
+    });
+
+    // Update or create portfolio items
+    holdings.forEach(h => {
+      const stock = market.find(s => s.t === h.ticker) || { p: h.avgPrice };
+      const currentValue = stock.p * h.quantity;
+      const profitLoss = currentValue - (h.quantity * h.avgPrice);
+
+      let item = portfolioList.querySelector(`.portfolio-item[data-ticker="${h.ticker}"]`);
+      if (!item) {
+        // Create new item if it doesn't exist
+        item = document.createElement('div');
+        item.className = 'portfolio-item';
+        item.dataset.ticker = h.ticker;
+        item.innerHTML = `
+          <div class="ticker">${h.ticker} <div class="small quantity">${h.quantity} shares</div></div>
+          <div style="text-align:right">
+            Invested: <span class="invested">${fmt(h.quantity * h.avgPrice)}</span><br>
+            Current Value: <span class="current-value">${fmt(currentValue)}</span><br>
+            P/L: <span class="pl ${profitLoss >= 0 ? 'positive' : 'negative'}">${fmt(profitLoss)}</span>
+            <button class="btn btn-ghost btn-sm" onclick="depositProfit('${h.ticker}')">Deposit</button>
+          </div>`;
+        portfolioList.appendChild(item);
+      } else {
+        // Update existing item
+        item.querySelector('.quantity').textContent = `${h.quantity} shares`;
+        item.querySelector('.invested').textContent = fmt(h.quantity * h.avgPrice);
+        item.querySelector('.current-value').textContent = fmt(currentValue);
+        item.querySelector('.pl').textContent = fmt(profitLoss);
+        item.querySelector('.pl').className = `pl ${profitLoss >= 0 ? 'positive' : 'negative'}`;
+      }
+    });
+
+    // Update account balance and cash
+    balanceEl.textContent = fmt(user.cash);
+    cashEl.textContent = fmt(user.cash);
+
+    // Calculate P/L
+    const holdingsValue = holdings.reduce((sum, h) => {
+      const stock = market.find(s => s.t === h.ticker) || { p: h.avgPrice };
+      return sum + stock.p * h.quantity;
+    }, 0);
+    const totalInvested = holdings.reduce((sum, h) => sum + h.quantity * h.avgPrice, 0);
+    const totalPL = holdingsValue - totalInvested;
+
+    plEl.textContent = fmt(totalPL);
+    plEl.className = totalPL >= 0 ? 'positive' : 'negative';
+
+    // Update order history
+    const existingOrders = Array.from(orderHistory.children);
+    const updatedOrders = orders.map(o => ({
+      id: o.id || `${o.ticker}-${o.timestamp}`,
+      text: `${o.type.toUpperCase()} ${o.quantity} ${o.ticker} @ ${fmt(o.price)} on ${new Date(o.timestamp).toLocaleString()}`
+    }));
+
+    // Remove outdated orders
+    existingOrders.forEach(item => {
+      const orderId = item.dataset.orderId;
+      if (!updatedOrders.some(o => o.id === orderId)) {
+        item.remove();
+      }
+    });
+
+    // Update or create order history items
+    updatedOrders.forEach(o => {
+      let item = orderHistory.querySelector(`[data-order-id="${o.id}"]`);
+      if (!item) {
+        item = document.createElement('div');
+        item.dataset.orderId = o.id;
+        item.textContent = o.text;
+        orderHistory.appendChild(item);
+      } else {
+        item.textContent = o.text;
+      }
+    });
+  } catch (err) {
+    console.error('Error fetching portfolio data:', err);
+    alert('Error fetching portfolio data: ' + err);
+  }
+}
+
+async function depositProfit(ticker) {
+  try {
+    const stock = market.find(s => s.t === ticker) || { p: 0 };
+    const holdings = await fetch(`${API}/holdings/${user.id}`, {
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include'
+    }).then(res => res.json());
+    const holding = holdings.find(h => h.ticker === ticker);
+    if (!holding) return;
+
+    const currentValue = stock.p * holding.quantity;
+    const tradeRes = await fetch(`${API}/trades/execute`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({
+        userId: user.id,
+        ticker,
+        quantity: holding.quantity,
+        price: stock.p,
+        type: 'SELL'
+      })
+    });
+
+    if (tradeRes.ok) {
+      const updatedUser = await fetch(`${API}/users/${user.id}`, {
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include'
+      }).then(res => res.json());
+      user.cash = updatedUser.cash;
+      localStorage.setItem('session', JSON.stringify(user));
+      renderPortfolio();
+      alert(`Deposited ${fmt(currentValue)} to cash account`);
+    } else {
+      alert('Error depositing profit');
+    }
+  } catch (err) {
+    alert('Network error: ' + err);
+  }
+}
+
+function renderHeader() {
+  headerActions.innerHTML = '';
+  const container = document.createElement('div');
+  container.style.position = 'relative';
+  container.style.display = 'flex';
+  container.style.gap = '10px';
+  headerActions.appendChild(container);
+
+  const addFundsBtn = document.createElement('button');
+  addFundsBtn.id = 'addFundsBtn';
+  addFundsBtn.className = 'btn btn-primary';
+  addFundsBtn.textContent = 'Add Funds';
+  container.appendChild(addFundsBtn);
+
+  const userContainer = document.createElement('div');
+  userContainer.style.position = 'relative';
+  userContainer.style.display = 'inline-block';
+  const userBtn = document.createElement('button');
+  userBtn.id = 'userBtn';
+  userBtn.className = 'btn btn-ghost';
+  userBtn.textContent = `${user.name} ▼`;
+  userContainer.appendChild(userBtn);
+
+  const dropdown = document.createElement('div');
+  dropdown.id = 'userDropdown';
+  dropdown.className = 'dropdown';
+  dropdown.innerHTML = `
+    <div class="btn" id="viewHistory">Order History</div>
+    <div class="btn" id="logoutBtn">Logout</div>`;
+  userContainer.appendChild(dropdown);
+  container.appendChild(userContainer);
+
+  dropdown.style.display = 'none';
+  userBtn.onclick = () => dropdown.style.display = dropdown.style.display === 'none' ? 'block' : 'none';
+  document.getElementById('logoutBtn').onclick = () => {
+    localStorage.removeItem('session');
+    window.location.href = 'login.html';
+  };
+  document.getElementById('viewHistory').onclick = async () => {
+    try {
+      const orders = await fetch(`${API}/orders/${user.id}`, {
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include'
+      }).then(res => res.json());
+      orderHistoryTable.innerHTML = ''; // Clear existing rows
+      orders.forEach(o => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${o.type.toUpperCase()}</td>
+          <td>${o.ticker}</td>
+          <td>${o.quantity}</td>
+          <td>${fmt(o.price)}</td>
+          <td>${new Date(o.timestamp).toLocaleString()}</td>`;
+        orderHistoryTable.appendChild(tr);
+      });
+      orderHistoryModal.style.display = 'flex';
+      dropdown.style.display = 'none';
+    } catch (err) {
+      alert('Error fetching order history: ' + err);
+    }
+  };
+  closeOrderHistoryBtn.onclick = () => orderHistoryModal.style.display = 'none';
+  document.addEventListener('click', e => {
+    if (!userContainer.contains(e.target) && !addFundsBtn.contains(e.target)) {
+      dropdown.style.display = 'none';
+    }
+  });
+
+  addFundsBtn.onclick = () => {
+    addFundsModal.style.display = 'flex';
+    manualAddContainer.style.display = 'none';
+  };
+}
+
+// --- Add Funds Logic ---
+closeAddFundsBtn.onclick = () => addFundsModal.style.display = 'none';
+manualAddBtn.onclick = () => manualAddContainer.style.display = 'block';
+bankAddBtn.onclick = () => alert('Account feature not simulated');
+// Uncomment the following for modal instead of alert
+/*
+bankAddBtn.onclick = () => {
+  document.getElementById('bankAccountModal').style.display = 'flex';
+};
+document.getElementById('closeBankAccountModal').onclick = () => {
+  document.getElementById('bankAccountModal').style.display = 'none';
+};
+*/
+addFundsExecuteBtn.onclick = async () => {
+  const amount = parseFloat(addAmountInput.value);
+  if (isNaN(amount) || amount <= 0) {
+    alert('Enter valid amount');
+    return;
+  }
+  try {
+    const res = await fetch(`${API}/users/${user.id}/add-funds`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({ amount })
+    });
+    if (res.ok) {
+      const updatedUser = await res.json();
+      user.cash = updatedUser.cash;
+      localStorage.setItem('session', JSON.stringify(user));
+      renderPortfolio();
+      addFundsModal.style.display = 'none';
+      alert(`${fmt(amount)} added to account`);
+    } else {
+      alert('Error adding funds');
+    }
+  } catch (err) {
+    alert('Network error: ' + err);
+  }
+};
+
+// --- Market Table ---
+function renderMarket() {
+  marketTableBody.innerHTML = '';
+  market.forEach(stock => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td class="ticker">${stock.t}</td>
+      <td class="price">$${stock.p.toFixed(2)}</td>
+      <td class="${stock.change >= 0 ? 'positive' : 'negative'}">${stock.change.toFixed(2)}</td>
+      <td>${stock.vol}</td>
+      <td><button class="btn btn-ghost btn-sm" onclick="openTradeModal('${stock.t}')">Trade</button></td>
+    `;
+    marketTableBody.appendChild(tr);
+  });
+}
+
+// --- Trade Modal Logic ---
+function updateOrderPreview() {
+  const ticker = tradeTickerInput.value;
+  const price = parseFloat(tradePriceInput.value); // Use the price from the input
+  const qty = parseInt(tradeQtyInput.value) || 1; // Default to 1 if invalid
+  if (isNaN(price) || !ticker) {
+    previewType.textContent = buyBtn.classList.contains('btn-primary') ? 'Buy' : 'Sell';
+    previewAmount.textContent = '$0.00';
+    previewCash.textContent = fmt(user.cash);
+    return;
+  }
+
+  const totalAmount = price * qty;
+  const cashAfter = type => {
+    const cost = totalAmount;
+    return type === 'BUY' ? user.cash - cost : user.cash + cost;
+  };
+
+  // Update preview elements
+  previewType.textContent = buyBtn.classList.contains('btn-primary') ? 'Buy' : 'Sell';
+  previewAmount.textContent = fmt(totalAmount);
+  previewCash.textContent = fmt(cashAfter(previewType.textContent.toUpperCase()));
+}
+
+function openTradeModal(ticker) {
+  const stock = market.find(s => s.t === ticker);
+  if (!stock) return;
+  tradeTickerInput.value = stock.t;
+  tradePriceInput.value = stock.p.toFixed(2);
+  tradeQtyInput.value = 1;
+  buyBtn.classList.add('btn-primary');
+  sellBtn.classList.remove('btn-primary');
+  sellBtn.classList.add('btn-ghost');
+  tradeModal.style.display = 'flex';
+  updateOrderPreview(); // Update preview when modal opens
+}
+
+// Close trade modal
+closeTradeBtn.onclick = () => tradeModal.style.display = 'none';
+
+// Add event listener for quantity changes
+tradeQtyInput.addEventListener('input', updateOrderPreview);
+
+// --- Buy/Sell Logic ---
+async function executeTrade(type) {
+  const ticker = tradeTickerInput.value;
+  const price = parseFloat(tradePriceInput.value); // Use the price from the input
+  const qty = parseInt(tradeQtyInput.value);
+  if (isNaN(qty) || qty <= 0) {
+    alert('Enter valid quantity');
+    return;
+  }
+  if (isNaN(price)) {
+    alert('Invalid price');
+    return;
+  }
+
+  try {
+    const res = await fetch(`${API}/trades/execute`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      body: JSON.stringify({
+        userId: user.id,
+        ticker,
+        quantity: qty,
+        price: price,
+        type: type.toUpperCase()
+      })
+    });
+
+    if (res.ok) {
+      const updatedUser = await fetch(`${API}/users/${user.id}`, {
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include'
+      }).then(res => res.json());
+      user.cash = updatedUser.cash;
+      localStorage.setItem('session', JSON.stringify(user));
+      renderPortfolio();
+      tradeModal.style.display = 'none';
+      alert(`${type.toUpperCase()} order for ${qty} shares of ${ticker} executed`);
+    } else {
+      const error = await res.json();
+      alert('Error executing trade: ' + error.message);
+    }
+  } catch (err) {
+    alert('Network error: ' + err);
+  }
+}
+
+buyBtn.onclick = () => {
+  buyBtn.classList.add('btn-primary');
+  sellBtn.classList.remove('btn-primary');
+  sellBtn.classList.add('btn-ghost');
+  updateOrderPreview();
+  executeTrade('buy');
+};
+
+sellBtn.onclick = () => {
+  sellBtn.classList.add('btn-primary');
+  buyBtn.classList.remove('btn-primary');
+  buyBtn.classList.add('btn-ghost');
+  updateOrderPreview();
+  executeTrade('sell');
+};
+
+// --- Simulate Market Changes ---
+let simulatorRunning = true;
+setInterval(() => {
+  if (!simulatorRunning) return;
+  market.forEach(s => {
+    const change = rnd(-2, 2);
+    s.change = change;
+    s.p = Math.max(1, s.p + change);
+  });
+  renderMarket();
+  renderPortfolio();
+  renderWatchlist();
+}, 2000);
+
+// Toggle simulator
+document.getElementById('toggleSimulator').onclick = () => {
+  simulatorRunning = !simulatorRunning;
+  document.getElementById('toggleSimulator').textContent = simulatorRunning ? 'Pause' : 'Resume';
+};
+
+// --- Quick Trade Button ---
+document.getElementById('openTrade').onclick = () => {
+  if (market.length > 0) openTradeModal(market[0].t);
+};
+
+// --- Initialize ---
+async function init() {
+  await initializeUser();
+  renderHeader();
+  await renderPortfolio();
+  renderMarket();
+  await renderWatchlist();
+}
+init();
+</script>
+</body>
+</html>
