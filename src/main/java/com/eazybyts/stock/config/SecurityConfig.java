@@ -11,6 +11,11 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import java.util.List;
 
 @Configuration
 @EnableWebSecurity
@@ -21,39 +26,41 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 
-   @Bean
-public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-    http
-        .csrf(csrf -> csrf.disable()) // Disable CSRF for simplicity
-        .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-        .cors(cors -> cors.configurationSource(request -> {
-            var corsConfig = new org.springframework.web.cors.CorsConfiguration();
-            corsConfig.setAllowedOrigins(
-                java.util.List.of("https://seshu-eazybyts-stock.onrender.com") // your frontend URL
+    @Bean
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+        http
+            .cors().and() // enable CORS
+            .csrf().disable()
+            .sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS).and()
+            .authorizeHttpRequests(auth -> auth
+                .requestMatchers("/api/**").permitAll() // allow API without login
+                .requestMatchers("/login.html", "/trade.html", "/favicon.ico").permitAll()
+                .requestMatchers("/js/**", "/css/**").permitAll()
+                .anyRequest().authenticated() // everything else requires auth
             );
-            corsConfig.setAllowedMethods(
-                java.util.List.of("GET", "POST", "PUT", "DELETE", "OPTIONS")
-            );
-            corsConfig.setAllowedHeaders(java.util.List.of("*"));
-            return corsConfig;
-        }))
-        .authorizeHttpRequests(auth -> auth
-            .requestMatchers("/", "/login.html", "/trade.html", "/favicon.ico").permitAll()
-            .requestMatchers("/api/**").permitAll()
-            .anyRequest().authenticated()
-        );
-    return http.build();
-}
-
+        return http.build();
+    }
 
     @Bean
     public UserDetailsService userDetailsService() {
-        // Simple in-memory user for testing
         var user = User.builder()
                 .username("admin")
                 .password(passwordEncoder().encode("password"))
                 .roles("USER")
                 .build();
         return new InMemoryUserDetailsManager(user);
+    }
+
+    @Bean
+    public CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration configuration = new CorsConfiguration();
+        configuration.setAllowedOrigins(List.of("https://seshu-eazybyts-stock.onrender.com")); // your frontend URL
+        configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+        configuration.setAllowedHeaders(List.of("*"));
+        configuration.setAllowCredentials(true);
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/**", configuration);
+        return source;
     }
 }
