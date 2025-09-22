@@ -34,16 +34,11 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
-                // Permit root path (homepage)
                 .requestMatchers("/").permitAll()
-                // Permit error handling to avoid 403 loops
                 .requestMatchers("/error").permitAll()
-                // API endpoints
                 .requestMatchers("/api/**").permitAll()
-                // Static resources (add more if needed, e.g., images)
                 .requestMatchers("/login.html", "/trade.html", "/favicon.ico").permitAll()
                 .requestMatchers("/js/**", "/css/**").permitAll()
-                // Everything else requires authentication
                 .anyRequest().authenticated()
             );
 
