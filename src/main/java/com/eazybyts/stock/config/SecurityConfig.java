@@ -21,18 +21,30 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 
-    @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
-        http
-            .csrf(csrf -> csrf.disable()) // Disable CSRF for simplicity
-            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-            .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/", "/login.html", "/trade.html", "/favicon.ico").permitAll() // allow access to HTML pages
-                .requestMatchers("/api/**").permitAll() // API endpoints open
-                .anyRequest().authenticated() // everything else requires authentication
+   @Bean
+public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    http
+        .csrf(csrf -> csrf.disable()) // Disable CSRF for simplicity
+        .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+        .cors(cors -> cors.configurationSource(request -> {
+            var corsConfig = new org.springframework.web.cors.CorsConfiguration();
+            corsConfig.setAllowedOrigins(
+                java.util.List.of("https://seshu-eazybyts-stock.onrender.com") // your frontend URL
             );
-        return http.build();
-    }
+            corsConfig.setAllowedMethods(
+                java.util.List.of("GET", "POST", "PUT", "DELETE", "OPTIONS")
+            );
+            corsConfig.setAllowedHeaders(java.util.List.of("*"));
+            return corsConfig;
+        }))
+        .authorizeHttpRequests(auth -> auth
+            .requestMatchers("/", "/login.html", "/trade.html", "/favicon.ico").permitAll()
+            .requestMatchers("/api/**").permitAll()
+            .anyRequest().authenticated()
+        );
+    return http.build();
+}
+
 
     @Bean
     public UserDetailsService userDetailsService() {
