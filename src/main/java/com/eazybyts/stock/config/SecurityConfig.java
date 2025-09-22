@@ -29,15 +29,16 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-            .cors().and() // enable CORS
+            .cors().and()
             .csrf().disable()
             .sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS).and()
             .authorizeHttpRequests(auth -> auth
-                .requestMatchers("/api/**").permitAll() // allow API without login
-                .requestMatchers("/login.html", "/trade.html", "/favicon.ico").permitAll()
+                .requestMatchers("/", "/login.html", "/trade.html", "/favicon.ico").permitAll()
                 .requestMatchers("/js/**", "/css/**").permitAll()
-                .anyRequest().authenticated() // everything else requires auth
+                .requestMatchers("/api/**").permitAll()
+                .anyRequest().authenticated()
             );
+
         return http.build();
     }
 
@@ -54,7 +55,7 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of("https://seshu-eazybyts-stock.onrender.com")); // your frontend URL
+        configuration.setAllowedOrigins(List.of("https://seshu-eazybyts-stock.onrender.com"));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);
