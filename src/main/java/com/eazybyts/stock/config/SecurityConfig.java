@@ -14,6 +14,8 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.web.servlet.handler.HandlerMappingIntrospector;
+import org.springframework.util.AntPathMatcher;
 
 import java.util.Arrays;
 
@@ -29,9 +31,9 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-            .cors().and()
-            .csrf().disable()
-            .sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS).and()
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+            .csrf(csrf -> csrf.disable())
+            .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(auth -> auth
                 // API endpoints
                 .requestMatchers("/api/**").permitAll()
@@ -48,10 +50,9 @@ public class SecurityConfig {
     @Bean
     public UserDetailsService userDetailsService() {
         // Optional: In-memory user for testing (remove in production)
-        User.UserBuilder users = User.withDefaultPasswordEncoder();
-        var user = users
+        var user = User.builder()
             .username("admin")
-            .password("password")
+            .password(passwordEncoder().encode("password")) // Use BCryptPasswordEncoder
             .roles("USER")
             .build();
         return new InMemoryUserDetailsManager(user);
@@ -60,8 +61,7 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        // Adjust origins based on your front-end setup
-        configuration.setAllowedOrigins(Arrays.asList("http://localhost:8080", "null"));
+        configuration.setAllowedOrigins(Arrays.asList("http://localhost:8080")); // Remove "null"
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE"));
         configuration.setAllowedHeaders(Arrays.asList("*"));
         configuration.setAllowCredentials(true);
@@ -69,5 +69,12 @@ public class SecurityConfig {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;
+    }
+
+    @Bean
+    public HandlerMappingIntrospector mvcHandlerMappingIntrospector() {
+        HandlerMappingIntrospector introspector = new HandlerMappingIntrospector();
+        introspector.setPathMatcher(new AntPathMatcher());
+        return introspector;
     }
 }
