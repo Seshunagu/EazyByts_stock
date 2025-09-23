@@ -19,6 +19,38 @@
   .btn-register{background: transparent; border:1px solid #06b6d4; color:#06b6d4;}
   .switch{text-align:center;margin-top:12px;font-size:13px; color:#94a3b8; cursor:pointer;}
   .switch span{color:#06b6d4;}
+
+  /* Updated Alert Modal */
+  .alert-overlay{
+    position:fixed; top:0; left:0; width:100%; height:100%;
+    background:rgba(0,0,0,0.7); display:flex;
+    align-items:center; justify-content:center; z-index:1000;
+    display:none; opacity:0; transition:opacity 0.3s ease-in-out;
+  }
+  .alert-overlay.show{opacity:1;}
+  .alert-box{
+    background:#0b1220; padding:32px; border-radius:20px; width:320px;
+    text-align:center; box-shadow:0 8px 24px rgba(0,0,0,0.5);
+    transform:scale(0.7); opacity:0;
+    transition:transform 0.3s ease, opacity 0.3s ease;
+  }
+  .alert-box.show{transform:scale(1); opacity:1;}
+  .alert-box h3{margin-bottom:16px; font-size:20px; font-weight:600; color:#fff;}
+  .alert-box p{margin-bottom:20px; font-size:15px; color:#cbd5e1; line-height:1.5;}
+  .alert-box button{
+    padding:12px 24px; border:none; border-radius:10px;
+    background:linear-gradient(90deg,#06b6d4,#7c3aed);
+    color:#041021; font-weight:600; font-size:14px; cursor:pointer;
+    transition:transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  .alert-box button:hover{
+    transform:translateY(-2px);
+    box-shadow:0 4px 12px rgba(6,182,212,0.4);
+  }
+  @keyframes pop{
+    from{transform:scale(0.7); opacity:0;}
+    to{transform:scale(1); opacity:1;}
+  }
 </style>
 </head>
 <body>
@@ -63,8 +95,39 @@
   </div>
 </div>
 
+<!-- Custom Alert -->
+<div class="alert-overlay" id="alertOverlay">
+  <div class="alert-box">
+    <h3 id="alertTitle">Notice</h3>
+    <p id="alertMessage">Something happened</p>
+    <button onclick="closeAlert()">OK</button>
+  </div>
+</div>
+
 <script>
 const API = "https://seshu-eazybyts-stock.onrender.com/api/users";
+
+// Custom alert function
+function showAlert(message, title="Notice"){
+  document.getElementById('alertTitle').textContent = title;
+  document.getElementById('alertMessage').textContent = message;
+  const overlay = document.getElementById('alertOverlay');
+  const box = overlay.querySelector('.alert-box');
+  overlay.style.display = 'flex';
+  setTimeout(() => {
+    overlay.classList.add('show');
+    box.classList.add('show');
+  }, 10);
+}
+function closeAlert(){
+  const overlay = document.getElementById('alertOverlay');
+  const box = overlay.querySelector('.alert-box');
+  overlay.classList.remove('show');
+  box.classList.remove('show');
+  setTimeout(() => {
+    overlay.style.display = 'none';
+  }, 300);
+}
 
 // Toggle forms
 document.getElementById('showRegister').onclick = ()=>{
@@ -85,8 +148,8 @@ document.getElementById('doRegister').onclick = async ()=>{
   const password = document.getElementById('regPassword').value;
   const confirm = document.getElementById('regConfirmPassword').value;
 
-  if(!email || !password) return alert("Email and password required");
-  if(password !== confirm) return alert("Passwords do not match");
+  if(!email || !password) return showAlert("Email and password required","Error");
+  if(password !== confirm) return showAlert("Passwords do not match","Error");
 
   try {
     const res = await fetch(`${API}/register`, {
@@ -96,22 +159,21 @@ document.getElementById('doRegister').onclick = async ()=>{
     });
     const data = await res.json();
     if(res.ok){
-      alert("Registration successful. Please login now.");
-      document.getElementById('showLogin').click(); // switch back to login form
+      showAlert("Registration successful. Please login now.","Success");
+      document.getElementById('showLogin').click();
     } else {
-      alert("Error: "+data.message);
+      showAlert(data.message || "Registration failed","Error");
     }
   } catch(err){
-    alert("Network error: "+err);
+    showAlert("Network error: "+err,"Error");
   }
 }
-
 
 // LOGIN
 document.getElementById('doLogin').onclick = async ()=>{
   const email = document.getElementById('loginEmail').value.trim();
   const password = document.getElementById('loginPassword').value;
-  if(!email || !password) return alert("Email and password required");
+  if(!email || !password) return showAlert("Email and password required","Error");
 
   try {
     const res = await fetch(`${API}/login`, {
@@ -124,10 +186,10 @@ document.getElementById('doLogin').onclick = async ()=>{
       localStorage.setItem("session", JSON.stringify(user));
       window.location.href = "trade.html";
     } else {
-      alert("Invalid email or password");
+      showAlert("Invalid email or password","Error");
     }
   } catch(err){
-    alert("Network error: "+err);
+    showAlert("Network error: "+err,"Error");
   }
 }
 </script>
