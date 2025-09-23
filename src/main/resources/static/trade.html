@@ -54,6 +54,32 @@
   input,select{width:100%;padding:10px;border-radius:8px;border:1px solid var(--glass-border);background:transparent;color:inherit}
   .form-row{margin-bottom:12px}
   .muted-tiny{font-size:11px;color:var(--muted)}
+  /* Custom Alert Modal */
+  .alert-overlay{
+    position:fixed; inset:0; background:rgba(0,0,0,0.7); display:flex;
+    align-items:center; justify-content:center; z-index:1000;
+    display:none; opacity:0; transition:opacity 0.3s ease-in-out;
+  }
+  .alert-overlay.show{opacity:1;}
+  .alert-box{
+    background:#0b1220; padding:32px; border-radius:20px; width:320px;
+    text-align:center; box-shadow:0 8px 24px rgba(0,0,0,0.5);
+    transform:scale(0.7); opacity:0;
+    transition:transform 0.3s ease, opacity 0.3s ease;
+  }
+  .alert-box.show{transform:scale(1); opacity:1;}
+  .alert-box h3{margin-bottom:16px; font-size:20px; font-weight:600; color:#fff;}
+  .alert-box p{margin-bottom:20px; font-size:15px; color:#cbd5e1; line-height:1.5;}
+  .alert-box button{
+    padding:12px 24px; border:none; border-radius:10px;
+    background:linear-gradient(90deg,#06b6d4,#7c3aed);
+    color:#041021; font-weight:600; font-size:14px; cursor:pointer;
+    transition:transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  .alert-box button:hover{
+    transform:translateY(-2px);
+    box-shadow:0 4px 12px rgba(6,182,212,0.4);
+  }
 </style>
 </head>
 <body>
@@ -187,23 +213,41 @@
   </div>
 </div>
 
-<!-- Bank Account Modal (Optional, Uncomment to Use) -->
-<!--
-<div id="bankAccountModal" class="overlay" style="display:none">
-  <div class="modal" role="dialog" aria-modal="true" style="max-width:400px;">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-      <h3>Feature Unavailable</h3>
-      <button class="btn btn-ghost" id="closeBankAccountModal">Close</button>
-    </div>
-    <div class="small">Account feature not simulated</div>
+<!-- Custom Alert Modal -->
+<div class="alert-overlay" id="alertOverlay">
+  <div class="alert-box">
+    <h3 id="alertTitle">Notice</h3>
+    <p id="alertMessage">Something happened</p>
+    <button onclick="closeAlert()">OK</button>
   </div>
 </div>
--->
 
 <script>
 // Utilities
 const fmt = n => typeof n === 'number' ? n.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }) : n;
 const rnd = (min, max) => Math.random() * (max - min) + min;
+
+// Custom alert function
+function showAlert(message, title="Notice"){
+  document.getElementById('alertTitle').textContent = title;
+  document.getElementById('alertMessage').textContent = message;
+  const overlay = document.getElementById('alertOverlay');
+  const box = overlay.querySelector('.alert-box');
+  overlay.style.display = 'flex';
+  setTimeout(() => {
+    overlay.classList.add('show');
+    box.classList.add('show');
+  }, 10);
+}
+function closeAlert(){
+  const overlay = document.getElementById('alertOverlay');
+  const box = overlay.querySelector('.alert-box');
+  overlay.classList.remove('show');
+  box.classList.remove('show');
+  setTimeout(() => {
+    overlay.style.display = 'none';
+  }, 300);
+}
 
 // API Base URL
 const API = "https://seshu-eazybyts-stock.onrender.com/api";
@@ -249,13 +293,13 @@ async function initializeUser() {
       }
     } catch (err) {
       console.error('Initialize user error:', err);
-      alert(`Error fetching user data: ${err.message}`);
+      showAlert(`Error fetching user data: ${err.message}`, 'Error');
       localStorage.removeItem('session');
       window.location.href = 'login.html';
     }
   } else {
     console.warn('No session found');
-    alert('No user session found. Please log in.');
+    showAlert('No user session found. Please log in.', 'Error');
     window.location.href = 'login.html';
   }
 }
@@ -304,6 +348,7 @@ async function renderWatchlist() {
     });
     if (!res.ok) {
       console.error('Failed to fetch watchlist:', res.status, res.statusText);
+      showAlert('Failed to fetch watchlist', 'Error');
       return;
     }
     const watchlist = await res.json();
@@ -339,13 +384,14 @@ async function renderWatchlist() {
     });
   } catch (err) {
     console.error('Error fetching watchlist:', err);
+    showAlert('Error fetching watchlist: ' + err, 'Error');
   }
 }
 
 addWatchBtn.onclick = async () => {
   const ticker = searchTicker.value.trim().toUpperCase();
   if (!ticker || !top100Tickers.some(s => s.t === ticker)) {
-    alert('Enter a valid ticker from the market list');
+    showAlert('Enter a valid ticker from the market list', 'Error');
     return;
   }
   try {
@@ -358,11 +404,12 @@ addWatchBtn.onclick = async () => {
     if (res.ok) {
       await renderWatchlist();
       searchTicker.value = '';
+      showAlert(`Ticker ${ticker} added to watchlist`, 'Success');
     } else {
-      alert('Error adding ticker to watchlist');
+      showAlert('Error adding ticker to watchlist', 'Error');
     }
   } catch (err) {
-    alert('Network error: ' + err);
+    showAlert('Network error: ' + err, 'Error');
   }
 };
 
@@ -477,7 +524,7 @@ async function renderPortfolio() {
     });
   } catch (err) {
     console.error('Error fetching portfolio data:', err);
-    alert('Error fetching portfolio data: ' + err);
+    showAlert('Error fetching portfolio data: ' + err, 'Error');
   }
 }
 
@@ -513,12 +560,12 @@ async function depositProfit(ticker) {
       user.cash = updatedUser.cash;
       localStorage.setItem('session', JSON.stringify(user));
       renderPortfolio();
-      alert(`Deposited ${fmt(currentValue)} to cash account`);
+      showAlert(`Deposited ${fmt(currentValue)} to cash account`, 'Success');
     } else {
-      alert('Error depositing profit');
+      showAlert('Error depositing profit', 'Error');
     }
   } catch (err) {
-    alert('Network error: ' + err);
+    showAlert('Network error: ' + err, 'Error');
   }
 }
 
@@ -580,7 +627,7 @@ function renderHeader() {
       orderHistoryModal.style.display = 'flex';
       dropdown.style.display = 'none';
     } catch (err) {
-      alert('Error fetching order history: ' + err);
+      showAlert('Error fetching order history: ' + err, 'Error');
     }
   };
   closeOrderHistoryBtn.onclick = () => orderHistoryModal.style.display = 'none';
@@ -599,7 +646,7 @@ function renderHeader() {
 // --- Add Funds Logic ---
 closeAddFundsBtn.onclick = () => addFundsModal.style.display = 'none';
 manualAddBtn.onclick = () => manualAddContainer.style.display = 'block';
-bankAddBtn.onclick = () => alert('Account feature not simulated');
+bankAddBtn.onclick = () => showAlert('Account feature not simulated', 'Info');
 // Uncomment the following for modal instead of alert
 /*
 bankAddBtn.onclick = () => {
@@ -612,7 +659,7 @@ document.getElementById('closeBankAccountModal').onclick = () => {
 addFundsExecuteBtn.onclick = async () => {
   const amount = parseFloat(addAmountInput.value);
   if (isNaN(amount) || amount <= 0) {
-    alert('Enter valid amount');
+    showAlert('Enter valid amount', 'Error');
     return;
   }
   try {
@@ -628,12 +675,12 @@ addFundsExecuteBtn.onclick = async () => {
       localStorage.setItem('session', JSON.stringify(user));
       renderPortfolio();
       addFundsModal.style.display = 'none';
-      alert(`${fmt(amount)} added to account`);
+      showAlert(`${fmt(amount)} added to account`, 'Success');
     } else {
-      alert('Error adding funds');
+      showAlert('Error adding funds', 'Error');
     }
   } catch (err) {
-    alert('Network error: ' + err);
+    showAlert('Network error: ' + err, 'Error');
   }
 };
 
@@ -702,11 +749,11 @@ async function executeTrade(type) {
   const price = parseFloat(tradePriceInput.value); // Use the price from the input
   const qty = parseInt(tradeQtyInput.value);
   if (isNaN(qty) || qty <= 0) {
-    alert('Enter valid quantity');
+    showAlert('Enter valid quantity', 'Error');
     return;
   }
   if (isNaN(price)) {
-    alert('Invalid price');
+    showAlert('Invalid price', 'Error');
     return;
   }
 
@@ -733,13 +780,13 @@ async function executeTrade(type) {
       localStorage.setItem('session', JSON.stringify(user));
       renderPortfolio();
       tradeModal.style.display = 'none';
-      alert(`${type.toUpperCase()} order for ${qty} shares of ${ticker} executed`);
+      showAlert(`${type.toUpperCase()} order for ${qty} shares of ${ticker} executed`, 'Success');
     } else {
       const error = await res.json();
-      alert('Error executing trade: ' + error.message);
+      showAlert('Error executing trade: ' + error.message, 'Error');
     }
   } catch (err) {
-    alert('Network error: ' + err);
+    showAlert('Network error: ' + err, 'Error');
   }
 }
 
